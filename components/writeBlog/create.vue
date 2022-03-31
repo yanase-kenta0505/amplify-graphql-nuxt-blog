@@ -1,34 +1,47 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col col="12">
-        <p>Title</p>
-        <input v-model="title" type="text" class="text" />
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col col="6">
-        <input class="image" type="file" @change="confirmImage" />
-      </v-col>
-      <v-col col="6">
-        <span v-if="confirmedImage">
-          <img class="c-image" :src="confirmedImage" alt />
-        </span>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col col="12">
-        <p>Contents</p>
-        <div class="mavonEditor">
-          <no-ssr>
-            <mavon-editor v-model="handbook" :toolbars="markdownOption" language="en" />
-          </no-ssr>
-        </div>
-      </v-col>
-    </v-row>
-  </v-container>
+  <v-app>
+    <v-container>
+      <v-row>
+        <v-col col="12">
+          <p>Title</p>
+          <input v-model="title" type="text" class="text" />
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col col="6">
+          <input class="image" type="file" @change="confirmImage" />
+        </v-col>
+        <v-col col="6">
+          <span v-if="confirmedImage">
+            <img class="c-image" :src="confirmedImage" alt />
+          </span>
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col col="12">
+          <p>Contents</p>
+          <div class="mavonEditor">
+            <client-only>
+              <mavon-editor v-model="handbook" :toolbars="markdownOption" language="en" />
+            </client-only>
+          </div>
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col class="btn-box" col="12">
+          <input class="btn" type="button" value="投稿" @click="submit" />
+        </v-col>
+      </v-row>
+    </v-container>
+  </v-app>
 </template>
+
+
+
 <script>
+import { API, Storage } from "aws-amplify"
+import awsmobile from "~/src/aws-exports"
+import { createBlog } from "~/src/graphql/mutations"
 export default {
   data() {
     return {
@@ -68,9 +81,11 @@ export default {
         preview: true, // 预览
       },
       handbook: '#### how to use mavonEditor in nuxt.js',
-      file: '',
+      imageData: '',
       confirmedImage: '',
+      imageUrl: '',
       message: '',
+      title: ''
     }
   },
   methods: {
@@ -91,12 +106,34 @@ export default {
         this.confirmedImage = e.target.result
       }
     },
+    async submit() {
+      const filePath = `cuisine/${this.imageData.name}`
+      const imageUrlDefault =
+        'https://' +
+        awsmobile.aws_user_files_s3_bucket +
+        '.s3-' +
+        awsmobile.aws_user_files_s3_bucket_region +
+        '.amazonaws.com/public/'
+      await Storage.put(filePath, this.imageData).then((result) => {
+        this.imageUrl = imageUrlDefault + filePath
+      })
+      const createBlogInfo = {
+        title: this.title,
+        image_url: this.imageUrl,
+        content: this.handbook,
+      }
+      await API.graphql({
+        query: createBlog,
+        variables: { input: createBlogInfo },
+      })
+      window.location.href = '/'
+    },
 
   },
 }
 </script>
 
-// 追加↓
+
 <style scoped>
 .mavonEditor {
   width: 100%;
@@ -117,5 +154,13 @@ export default {
 .c-image {
   width: 300px;
   height: 150px;
+}
+.btn {
+  border: 1px solid #000000;
+  background-color: white;
+  color: #424242;
+  width: 90px;
+  height: 30px;
+  border-radius: 10px;
 }
 </style>
